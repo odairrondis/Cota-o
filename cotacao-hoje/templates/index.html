@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cotação Hoje</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💱 Cotação Hoje</h1>
+            <p class="subtitulo">Cotações em tempo real com histórico</p>
+        </header>
+
+        <!-- Abas de Navegação -->
+        <div class="abas">
+            <a href="/" class="aba-botao {% if pagina == 'cotacoes' %}ativo{% endif %}">Cotações</a>
+            <a href="/historico" class="aba-botao {% if pagina == 'historico' %}ativo{% endif %}">Histórico</a>
+            <a href="/alertas" class="aba-botao {% if pagina == 'alertas' %}ativo{% endif %}">Alertas</a>
+        </div>
+
+        <!-- Mensagem de Erro -->
+        <div id="mensagem-erro" class="mensagem-erro" style="display: none;"></div>
+
+        <!-- ✅ NOVO: Alertas Disparados (em TODAS as páginas) -->
+        {% if alertas_disparados %}
+            <div class="alertas-disparados">
+                {% for alerta in alertas_disparados %}
+                    <div class="alerta-disparado">
+                        <span class="emoji-alerta">🔔</span>
+                        <div class="texto-alerta">
+                            <strong>ALERTA ATIVADO!</strong><br>
+                            {{ alerta.moeda }} {{ alerta.tipo.upper() }} R$ {{ "%.2f"|format(alerta.valor_limite) }}<br>
+                            <small>Valor atual: R$ {{ "%.2f"|format(alerta.valor_atual) }}</small>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Conteúdo da Página -->
+        <div id="conteudo-principal" class="conteudo-principal">
+            {% if pagina == 'cotacoes' %}
+                <div id="cotacoes-container" class="cotacoes-container">
+                    {% if cotacoes %}
+                        <div class="cotacao-card">
+                            <div class="cotacao-moeda">💵 {{ cotacoes.usd.nome }}</div>
+                            <div class="cotacao-valor">R$ {{ "%.2f"|format(cotacoes.usd.valor_atual) }}</div>
+                            <div class="cotacao-variacao {% if cotacoes.usd.variacao >= 0 %}variacao-positiva{% else %}variacao-negativa{% endif %}">
+                                {% if cotacoes.usd.variacao >= 0 %}+{% endif %}{{ "%.2f"|format(cotacoes.usd.variacao) }}%
+                            </div>
+                        </div>
+
+                        <div class="cotacao-card">
+                            <div class="cotacao-moeda">💶 {{ cotacoes.eur.nome }}</div>
+                            <div class="cotacao-valor">R$ {{ "%.2f"|format(cotacoes.eur.valor_atual) }}</div>
+                            <div class="cotacao-variacao {% if cotacoes.eur.variacao >= 0 %}variacao-positiva{% else %}variacao-negativa{% endif %}">
+                                {% if cotacoes.eur.variacao >= 0 %}+{% endif %}{{ "%.2f"|format(cotacoes.eur.variacao) }}%
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="carregando"><p>⚠️ Sem dados disponíveis</p></div>
+                    {% endif %}
+                </div>
+
+            {% elif pagina == 'historico' %}
+                <div class="historico-opcoes">
+                    <a href="/historico?moeda=USD" class="botao-historico">📊 USD</a>
+                    <a href="/historico?moeda=EUR" class="botao-historico">📊 EUR</a>
+                </div>
+                <div id="historico-container" class="historico-container">
+                    {% if historico %}
+                        <h3>Histórico de {{ moeda }} (últimos 20 registros)</h3>
+                        {% for item in historico %}
+                            <div class="historico-item">
+                                <div class="historico-valor">
+                                    R$ {{ "%.2f"|format(item.valor_atual) }}
+                                    <span class="{% if item.variacao >= 0 %}variacao-positiva{% else %}variacao-negativa{% endif %}">
+                                        {% if item.variacao >= 0 %}+{% endif %}{{ "%.2f"|format(item.variacao) }}%
+                                    </span>
+                                </div>
+                                <div class="historico-timestamp">{{ item.criado_em }}</div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="carregando"><p>Sem histórico disponível</p></div>
+                    {% endif %}
+                </div>
+
+            {% elif pagina == 'alertas' %}
+                <div class="alertas-formulario">
+                    <h3>Criar Novo Alerta</h3>
+                    <form method="POST" action="/criar-alerta">
+                        <div class="formulario-grupo">
+                            <label>Moeda:</label>
+                            <select name="moeda" required>
+                                <option value="USD">Dólar (USD)</option>
+                                <option value="EUR">Euro (EUR)</option>
+                            </select>
+                        </div>
+                        <div class="formulario-grupo">
+                            <label>Valor Limite:</label>
+                            <input type="number" name="valor_limite" step="0.01" placeholder="Ex: 5.50" required>
+                        </div>
+                        <div class="formulario-grupo">
+                            <label>Tipo:</label>
+                            <select name="tipo" required>
+                                <option value="maior">Maior que</option>
+                                <option value="menor">Menor que</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="botao-criar">Criar Alerta</button>
+                    </form>
+                </div>
+
+                <div id="alertas-container" class="alertas-container">
+                    {% if alertas %}
+                        <h3>Seus Alertas Ativos</h3>
+                        {% for alerta in alertas %}
+                            <div class="alerta-item">
+                                <div class="alerta-info">
+                                    <div class="alerta-moeda">
+                                        {{ alerta.moeda }} 
+                                        {% if alerta.tipo == 'maior' %}MAIOR QUE{% else %}MENOR QUE{% endif %} 
+                                        R$ {{ "%.2f"|format(alerta.valor_limite) }}
+                                    </div>
+                                    <div class="alerta-tipo">
+                                        {% if alerta.disparado %}
+                                            <span class="alerta-status-disparado">✅ DISPARADO em {{ alerta.disparado_em }}</span>
+                                        {% else %}
+                                            <span class="alerta-status-pendente">⏳ Pendente</span>
+                                        {% endif %}
+                                        <br>
+                                        Criado em: {{ alerta.criado_em }}
+                                    </div>
+                                </div>
+                                <a href="/deletar-alerta/{{ alerta.id }}" class="botao-deletar" onclick="return confirm('Deletar este alerta?')">Deletar</a>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="carregando"><p>Nenhum alerta criado</p></div>
+                    {% endif %}
+                </div>
+
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p id="ultima-atualizacao" class="ultima-atualizacao">
+                Última atualização: {{ atualizado_em or '--:--:--' }}
+            </p>
+            <p id="total-buscas" class="total-buscas">
+                Total de buscas: {{ total_buscas or 0 }}
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Script MÍNIMO apenas para atualizar cotações a cada 30 segundos
+        function atualizarPagina() {
+            location.reload();
+        }
+
+        // Atualizar a página a cada 30 segundos (em qualquer página)
+        setInterval(atualizarPagina, 30000);
+    </script>
+</body>
+</html>
